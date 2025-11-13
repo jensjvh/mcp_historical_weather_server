@@ -3,13 +3,18 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp_weather_server"
+name = "mcp_historical_weather_server"
 version = "0.6.0"
 authors = [
   { name = "danielshih", email = "dog830228@gmail.com" },
 ]
+maintainers = [
+  { name = "jensjvh" }
+]
+
 description = "An MCP server for weather information"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
   "mcp[cli]>=1.12.0",
@@ -22,12 +27,13 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mcp_weather_server"]
+packages = ["src/mcp_historical_weather_server"]
 
 [project.scripts]
-mcp_weather_server = "mcp_weather_server:main"
+mcp_weather_server = "mcp_historical_weather_server:main"
 
 [project.urls]
 Source = "https://github.com/isdaniel/mcp_weather_server"
+Repository = "https://github.com/jensjvh/mcp_historical_weather_server"
 
 

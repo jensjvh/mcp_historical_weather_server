@@ -1,10 +1,4 @@
-[![smithery badge](https://smithery.ai/badge/@isdaniel/mcp_weather_server)](https://smithery.ai/server/@isdaniel/mcp_weather_server)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/mcp-weather-server)](https://pypi.org/project/mcp-weather-server/)
-[![PyPI - Version](https://img.shields.io/pypi/v/mcp-weather-server)](https://pypi.org/project/mcp-weather-server/)
-
-<a href="https://glama.ai/mcp/servers/@isdaniel/mcp_weather_server">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@isdaniel/mcp_weather_server/badge" />
-</a>
+Fork of https://github.com/isdaniel/mcp_weather_server/
 
 # Weather MCP Server
 
