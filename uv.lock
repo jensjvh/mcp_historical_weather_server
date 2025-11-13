@@ -200,7 +200,7 @@ cli = [
 ]
 
 [[package]]
-name = "mcp-weather-server"
+name = "mcp-historical-weather-server"
 version = "0.6.0"
 source = { editable = "." }
 dependencies = [
