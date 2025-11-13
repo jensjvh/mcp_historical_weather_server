@@ -84,6 +84,85 @@ class GetCurrentWeatherToolHandler(ToolHandler):
             ]
 
 
+class GetHistoricalWeatherToolHandler(ToolHandler):
+    """
+    Tool handler for getting historical weather information for a city.
+    """
+    
+    def __init__(self):
+        super().__init__("get_historical_weather")
+        self.weather_service = WeatherService()
+    
+    def get_tool_description(self) -> Tool:
+        """
+        Return the tool description for historical weather lookup.
+        """
+        return Tool(
+            name=self.name,
+            description="""Get historical weather information for a specified city.
+            It extracts the historical hour's temperature and weather code, maps
+            the weather code to a human-readable description, and returns a formatted summary.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "The name of the city to fetch weather information for, PLEASE NOTE English name only, if the parameter city isn't English please translate to English before invoking this function."
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Optional start date in format YYYY-MM-DD (ISO 8601). If omitted defaults to yesterday (UTC)."
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "Optional end date in format YYYY-MM-DD (ISO 8601). If omitted defaults to start_date."
+                    }
+                },
+                "required": ["city"]
+            }
+        )
+    
+    async def run_tool(self, args: dict) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+        """
+        Execute the historical weather tool.
+        """
+        try:
+            self.validate_required_args(args, ["city"])
+            
+            city = args["city"]
+            start_date = args.get("start_date")
+            end_date = args.get("end_date")
+            logger.info(f"Getting historical weather for: {city} start_date={start_date} end_date={end_date}")
+
+            weather_data = await self.weather_service.get_historical_weather(city, start_date=start_date, end_date=end_date)
+            
+            formatted_response = self.weather_service.format_historical_weather_response(weather_data)
+            
+            return [
+                TextContent(
+                    type="text",
+                    text=formatted_response
+                )
+            ]
+            
+        except ValueError as e:
+            logger.error(f"Weather service error: {str(e)}")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error: {str(e)}"
+                )
+            ]
+        except Exception as e:
+            logger.exception(f"Unexpected error in get_historical_weather: {str(e)}")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Unexpected error occurred: {str(e)}"
+                )
+            ]
+
+
 class GetWeatherByDateRangeToolHandler(ToolHandler):
     """
     Tool handler for getting weather information for a date range.
@@ -133,12 +212,10 @@ class GetWeatherByDateRangeToolHandler(ToolHandler):
             
             logger.info(f"Getting weather for {city} from {start_date} to {end_date}")
             
-            # Get weather data from service
             weather_data = await self.weather_service.get_weather_by_date_range(
                 city, start_date, end_date
             )
             
-            # Format the response for analysis
             formatted_response = self.weather_service.format_weather_range_response(weather_data)
             
             return [

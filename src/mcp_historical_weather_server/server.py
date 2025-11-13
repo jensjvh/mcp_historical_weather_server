@@ -26,6 +26,7 @@ from mcp.types import EmbeddedResource, ImageContent, TextContent, Tool
 from .tools.toolhandler import ToolHandler
 from .tools.tools_weather import (
     GetCurrentWeatherToolHandler,
+    GetHistoricalWeatherToolHandler,
     GetWeatherByDateRangeToolHandler,
     GetWeatherDetailsToolHandler,
 )
@@ -86,6 +87,7 @@ def register_all_tools() -> None:
     add_tool_handler(GetCurrentWeatherToolHandler())
     add_tool_handler(GetWeatherByDateRangeToolHandler())
     add_tool_handler(GetWeatherDetailsToolHandler())
+    add_tool_handler(GetHistoricalWeatherToolHandler())
 
     # Time tools
     add_tool_handler(GetCurrentDateTimeToolHandler())

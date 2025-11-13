@@ -5,8 +5,8 @@ This separates the business logic from the tool handlers.
 
 import httpx
 import logging
-from typing import Dict, List, Tuple, Any
-from datetime import datetime, timezone
+from typing import Dict, List, Tuple, Any, Optional
+from datetime import datetime, timezone, timedelta
 from . import utils
 
 logger = logging.getLogger("mcp-weather")
@@ -22,6 +22,7 @@ class WeatherService:
 
     BASE_GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
     BASE_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+    BASE_HISTORICAL_URL = "https://archive-api.open-meteo.com/v1/archive"
 
     def __init__(self):
         """Initialize the weather service."""
@@ -137,12 +138,44 @@ class WeatherService:
             raise ValueError(f"Network error while fetching weather for {city}: {str(e)}")
         except (KeyError, IndexError) as e:
             raise ValueError(f"Invalid response format from weather API: {str(e)}")
+    
+    async def get_historical_weather(self, city: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get historical weather information for a specified city.
+
+        Args:
+            city: The name of the city
+            start_date: Start date in YYYY-MM-DD format (defaults to yesterday UTC)
+            end_date: End date in YYYY-MM-DD format (defaults to start_date)
+
+        Returns:
+            Dictionary containing historical weather data
+
+        Raises:
+            ValueError: If date format is invalid or start_date > end_date
+        """
+        if start_date is None:
+            start_date = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
+        if end_date is None:
+            end_date = start_date
+
+        try:
+            sd = datetime.fromisoformat(start_date)
+            ed = datetime.fromisoformat(end_date)
+        except ValueError:
+            raise ValueError("start_date and end_date must be in YYYY-MM-DD format")
+
+        if sd.date() > ed.date():
+            raise ValueError("start_date must be on or before end_date")
+
+        return await self.get_weather_by_date_range(city, start_date=start_date, end_date=end_date, use_archive=True)
 
     async def get_weather_by_date_range(
         self,
         city: str,
         start_date: str,
-        end_date: str
+        end_date: str,
+        use_archive: bool = False
     ) -> Dict[str, Any]:
         """
         Get weather information for a specified city between start and end dates.
@@ -151,6 +184,7 @@ class WeatherService:
             city: The name of the city
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
+            use_archive: Whether to call the archive endpoint for historical data
 
         Returns:
             Dictionary containing weather data for the date range
@@ -161,21 +195,23 @@ class WeatherService:
         try:
             latitude, longitude = await self.get_coordinates(city)
 
-            # Build the weather API URL for date range with enhanced variables
-            url = (
-                f"{self.BASE_WEATHER_URL}"
-                f"?latitude={latitude}&longitude={longitude}"
-                f"&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,weather_code,"
-                f"wind_speed_10m,wind_direction_10m,wind_gusts_10m,"
-                f"precipitation,rain,snowfall,precipitation_probability,"
-                f"pressure_msl,cloud_cover,uv_index,apparent_temperature,visibility"
-                f"&timezone=GMT&start_date={start_date}&end_date={end_date}"
-            )
+            base = self.BASE_HISTORICAL_URL if use_archive else self.BASE_WEATHER_URL
+            params = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "hourly": "temperature_2m,relative_humidity_2m,dew_point_2m,weather_code,"
+                          "wind_speed_10m,wind_direction_10m,wind_gusts_10m,"
+                          "precipitation,rain,snowfall,precipitation_probability,"
+                          "pressure_msl,cloud_cover,uv_index,apparent_temperature,visibility",
+                "timezone": "GMT",
+                "start_date": start_date,
+                "end_date": end_date
+            }
 
-            logger.info(f"Fetching weather history from: {url}")
+            logger.info(f"Fetching weather history from: {base} params={params}")
 
             async with httpx.AsyncClient() as client:
-                response = await client.get(url)
+                response = await client.get(base, params=params)
 
                 if response.status_code != 200:
                     raise ValueError(f"Weather API returned status {response.status_code}")
@@ -301,6 +337,12 @@ class WeatherService:
             Formatted string ready for AI analysis
         """
         return utils.format_get_weather_bytime(weather_data)
+    
+    def format_historical_weather_response(self, weather_data: Dict[str, Any]) -> str:
+        """
+        Compatibility wrapper used by the tool handler for historical responses.
+        """
+        return self.format_weather_range_response(weather_data)
 
     def _degrees_to_compass(self, degrees: float) -> str:
         """
