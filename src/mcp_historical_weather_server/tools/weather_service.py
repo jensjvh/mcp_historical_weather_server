@@ -227,7 +227,7 @@ class WeatherService:
                     weather_data.append({
                         "time": hourly["time"][i],
                         "temperature_c": hourly["temperature_2m"][i],
-                        "humidity_percent": hourly["relative_humidity_2m"][i],
+                        "relative_humidity_percent": hourly["relative_humidity_2m"][i],
                         "dew_point_c": hourly["dew_point_2m"][i],
                         "weather_code": hourly["weather_code"][i],
                         "weather_description": utils.weather_descriptions.get(
