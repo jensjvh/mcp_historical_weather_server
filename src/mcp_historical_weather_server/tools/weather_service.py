@@ -7,6 +7,9 @@ import httpx
 import logging
 from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime, timezone, timedelta
+from dateutil import parser
+from collections import defaultdict
+import json
 from . import utils
 
 logger = logging.getLogger("mcp-weather")
@@ -337,12 +340,88 @@ class WeatherService:
             Formatted string ready for AI analysis
         """
         return utils.format_get_weather_bytime(weather_data)
+
+    def format_weather_range_daily_summary(self, weather_data: dict, date_format: str = "%d-%m-%Y", sunny_threshold: float = 30.0) -> str:
+        """
+        Convert hourly weather_data into a list of daily summaries.
+
+        Returns JSON string of list of dicts:
+          [{"date":"25-11-2025","location":"Helsinki","sunny":"False"}, ...]
+
+        Parameters:
+        - weather_data: dict from get_weather_by_date_range (expects keys: city/location, weather_data (list))
+        - date_format: date output format (default dd.mm.YYYY)
+        - sunny_threshold: average cloud cover (%) below which we consider the day sunny
+
+        Notes:
+        - If cloud cover is missing, falls back to weather_code heuristics (0,1,2 -> sunny)
+        - Returns a JSON string for compatibility with existing handlers that expect text output.
+        """
+        city = weather_data.get("city") or weather_data.get("location") or "Unknown"
+        hourly_list = weather_data.get("weather_data") or weather_data.get("weather") or []
+
+        daily = defaultdict(list)
+        for entry in hourly_list:
+            t = entry.get("time") or entry.get("datetime") or entry.get("date")
+            if not t:
+                continue
+            try:
+                dt = parser.isoparse(t)
+            except Exception:
+                try:
+                    dt = datetime.fromisoformat(t)
+                except Exception:
+                    continue
+            date_key = dt.date().isoformat()
+            daily[date_key].append(entry)
+
+        summary_list = []
+        for date_iso, entries in sorted(daily.items(), reverse=True):  # newest first; remove reverse() for oldest-first
+            # compute average cloud cover if present
+            cloud_vals = [e.get("cloud_cover_percent") for e in entries if e.get("cloud_cover_percent") is not None]
+            avg_cloud = None
+            if cloud_vals:
+                try:
+                    nums = [float(x) for x in cloud_vals]
+                    avg_cloud = sum(nums) / len(nums)
+                except Exception:
+                    avg_cloud = None
+
+            sunny_code_count = 0
+            total_codes = 0
+            for e in entries:
+                code = e.get("weather_code")
+                if code is None:
+                    continue
+                total_codes += 1
+                if int(code) in {0, 1, 2}:  # clear / mainly clear / partly cloudy
+                    sunny_code_count += 1
+
+            if avg_cloud is not None:
+                sunny_bool = avg_cloud < sunny_threshold
+            elif total_codes > 0:
+                sunny_bool = (sunny_code_count / total_codes) >= 0.6  # >=60% clear-ish hours
+            else:
+                sunny_bool = False
+
+            try:
+                pretty_date = parser.isoparse(date_iso).strftime(date_format)
+            except Exception:
+                pretty_date = date_iso
+
+            summary_list.append({
+                "date": pretty_date,
+                "location": city,
+                "sunny": "True" if sunny_bool else "False"
+            })
+
+        return json.dumps(summary_list, indent=2, ensure_ascii=False)
     
     def format_historical_weather_response(self, weather_data: Dict[str, Any]) -> str:
         """
         Compatibility wrapper used by the tool handler for historical responses.
         """
-        return self.format_weather_range_response(weather_data)
+        return self.format_weather_range_daily_summary(weather_data)
 
     def _degrees_to_compass(self, degrees: float) -> str:
         """
