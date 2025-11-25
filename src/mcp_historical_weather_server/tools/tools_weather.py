@@ -99,9 +99,11 @@ class GetHistoricalWeatherToolHandler(ToolHandler):
         """
         return Tool(
             name=self.name,
-            description="""Get historical weather information for a specified city.
-            It extracts the historical hour's temperature and weather code, maps
-            the weather code to a human-readable description, and returns a formatted summary.""",
+            description=(
+                "Get historical weather data for a city. "
+                "Returns daily summaries in format: "
+                '[{"date":"dd-mm-yyyy","location":"city","sunny":true/false},...]'
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -136,12 +138,12 @@ class GetHistoricalWeatherToolHandler(ToolHandler):
 
             weather_data = await self.weather_service.get_historical_weather(city, start_date=start_date, end_date=end_date)
             
-            formatted_response = self.weather_service.format_historical_weather_response(weather_data)
+            weather_json = self.weather_service.format_historical_weather_response(weather_data)
             
             return [
                 TextContent(
                     type="text",
-                    text=formatted_response
+                    text=weather_json
                 )
             ]
             
@@ -178,7 +180,11 @@ class GetWeatherByDateRangeToolHandler(ToolHandler):
         """
         return Tool(
             name=self.name,
-            description="""Get weather information for a specified city between start and end dates.""",
+            description=(
+                "Get weather data for a date range. "
+                "Returns daily summaries in WeatherData format: "
+                '[{"date":"dd-mm-yyyy","location":"city","sunny":true/false},...]'
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -202,6 +208,8 @@ class GetWeatherByDateRangeToolHandler(ToolHandler):
     async def run_tool(self, args: dict) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
         """
         Execute the weather date range tool.
+
+        Returns WeatherData format as JSON text.
         """
         try:
             self.validate_required_args(args, ["city", "start_date", "end_date"])
@@ -216,12 +224,15 @@ class GetWeatherByDateRangeToolHandler(ToolHandler):
                 city, start_date, end_date
             )
             
-            formatted_response = self.weather_service.format_weather_range_response(weather_data)
+            weather_json = self.weather_service.format_weather_range_daily_summary(
+                weather_data,
+                return_json=True
+            )
             
             return [
                 TextContent(
                     type="text",
-                    text=formatted_response
+                    text=weather_json
                 )
             ]
             

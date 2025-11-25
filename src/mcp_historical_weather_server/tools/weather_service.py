@@ -341,22 +341,29 @@ class WeatherService:
         """
         return utils.format_get_weather_bytime(weather_data)
 
-    def format_weather_range_daily_summary(self, weather_data: dict, date_format: str = "%d-%m-%Y", sunny_threshold: float = 30.0) -> str:
+    def format_weather_range_daily_summary(
+        self, 
+        weather_data: dict, 
+        date_format: str = "%d-%m-%Y", 
+        sunny_threshold: float = 30.0,
+        return_json: bool = True
+    ) -> str:
         """
-        Convert hourly weather_data into a list of daily summaries.
+        Convert hourly weather_data into a list of daily summaries in WeatherData format.
 
-        Returns JSON string of list of dicts:
-          [{"date":"25-11-2025","location":"Helsinki","sunny":"False"}, ...]
+        Args:
+            weather_data: Dictionary containing weather data with hourly entries
+            date_format: strftime format for date output (default: dd-mm-yyyy)
+            sunny_threshold: Cloud cover percentage threshold for "sunny" classification
+            return_json: If True, returns JSON string; if False, returns list of dicts
 
-        Parameters:
-        - weather_data: dict from get_weather_by_date_range (expects keys: city/location, weather_data (list))
-        - date_format: date output format (default dd.mm.YYYY)
-        - sunny_threshold: average cloud cover (%) below which we consider the day sunny
-
-        Notes:
-        - If cloud cover is missing, falls back to weather_code heuristics (0,1,2 -> sunny)
-        - Returns a JSON string for compatibility with existing handlers that expect text output.
+        Returns:
+            JSON string of list of dicts in WeatherData format:
+            [{"date":"25-11-2025","location":"Helsinki","sunny": false}, ...]
         """
+        logger.debug("format_weather_range_daily_summary input keys=%s", 
+                    list(weather_data.keys()) if isinstance(weather_data, dict) else type(weather_data))
+        
         city = weather_data.get("city") or weather_data.get("location") or "Unknown"
         hourly_list = weather_data.get("weather_data") or weather_data.get("weather") or []
 
@@ -376,9 +383,10 @@ class WeatherService:
             daily[date_key].append(entry)
 
         summary_list = []
-        for date_iso, entries in sorted(daily.items(), reverse=True):  # newest first; remove reverse() for oldest-first
-            # compute average cloud cover if present
-            cloud_vals = [e.get("cloud_cover_percent") for e in entries if e.get("cloud_cover_percent") is not None]
+        for date_iso, entries in sorted(daily.items(), reverse=True):  # newest first
+            # Compute average cloud cover if present
+            cloud_vals = [e.get("cloud_cover_percent") for e in entries 
+                         if e.get("cloud_cover_percent") is not None]
             avg_cloud = None
             if cloud_vals:
                 try:
@@ -394,13 +402,13 @@ class WeatherService:
                 if code is None:
                     continue
                 total_codes += 1
-                if int(code) in {0, 1, 2}:  # clear / mainly clear / partly cloudy
+                if int(code) in {0, 1, 2}:
                     sunny_code_count += 1
 
             if avg_cloud is not None:
                 sunny_bool = avg_cloud < sunny_threshold
             elif total_codes > 0:
-                sunny_bool = (sunny_code_count / total_codes) >= 0.6  # >=60% clear-ish hours
+                sunny_bool = (sunny_code_count / total_codes) >= 0.6
             else:
                 sunny_bool = False
 
@@ -412,16 +420,28 @@ class WeatherService:
             summary_list.append({
                 "date": pretty_date,
                 "location": city,
-                "sunny": "True" if sunny_bool else "False"
+                "sunny": bool(sunny_bool)
             })
 
-        return json.dumps(summary_list, indent=2, ensure_ascii=False)
+        logger.debug("Daily summary count=%d for city=%s", len(summary_list), city)
+        
+        if return_json:
+            return json.dumps(summary_list, indent=2, ensure_ascii=False)
+        else:
+            return summary_list
     
     def format_historical_weather_response(self, weather_data: Dict[str, Any]) -> str:
         """
-        Compatibility wrapper used by the tool handler for historical responses.
+        Format historical weather response in WeatherData format.
+        This is the method called by tool handlers.
+        
+        Args:
+            weather_data: Weather data dictionary from get_historical_weather
+            
+        Returns:
+            JSON string in WeatherData format
         """
-        return self.format_weather_range_daily_summary(weather_data)
+        return self.format_weather_range_daily_summary(weather_data, return_json=True)
 
     def _degrees_to_compass(self, degrees: float) -> str:
         """
