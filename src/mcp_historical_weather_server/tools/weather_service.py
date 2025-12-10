@@ -405,10 +405,10 @@ class WeatherService:
                 if int(code) in {0, 1, 2}:
                     sunny_code_count += 1
 
-            # if avg_cloud is not None:
-            #     sunny_bool = avg_cloud < sunny_threshold
-            if total_codes > 0:
-                sunny_bool = (sunny_code_count / total_codes) >= 0.5
+            if avg_cloud is not None:
+                sunny_bool = avg_cloud < sunny_threshold
+            elif total_codes > 0:
+                sunny_bool = (sunny_code_count / total_codes) >= 0.6
             else:
                 sunny_bool = False
 
